@@ -5,6 +5,7 @@ import {
   invalidateCachedLink,
   runInBackground,
   setCachedLink,
+  warmAllLinks,
   type CachedLink,
 } from "@/lib/redirect-cache";
 
@@ -23,6 +24,21 @@ export const Route = createFileRoute("/$slug")({
 
         try {
           let entry = getCachedLink(slug);
+
+          if (!entry) {
+            // One bulk load warms every slug at once, so the first click on any
+            // newly created link is served from memory like the popular ones.
+            await warmAllLinks(async () => {
+              const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+              const { data, error } = await supabaseAdmin
+                .from("links")
+                .select("id, slug, destination_url, is_active")
+                .limit(5000);
+              if (error) throw error;
+              return data ?? [];
+            });
+            entry = getCachedLink(slug);
+          }
 
           if (!entry) {
             const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
