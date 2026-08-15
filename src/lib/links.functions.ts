@@ -27,7 +27,21 @@ export const listLinks = createServerFn({ method: "GET" })
       .select("id, slug, destination_url, is_active, click_count, created_at, updated_at")
       .order("created_at", { ascending: false });
     if (error) throw new Error(error.message);
-    return (data ?? []) as LinkRow[];
+
+    const rows = (data ?? []) as LinkRow[];
+    if (rows.length === 0) return rows;
+
+    const { data: clicks, error: clicksError } = await context.supabase
+      .from("click_events")
+      .select("link_id");
+    if (clicksError) throw new Error(clicksError.message);
+
+    const counts = new Map<string, number>();
+    for (const click of clicks ?? []) {
+      counts.set(click.link_id, (counts.get(click.link_id) ?? 0) + 1);
+    }
+
+    return rows.map((row) => ({ ...row, click_count: counts.get(row.id) ?? 0 }));
   });
 
 export const createLink = createServerFn({ method: "POST" })
