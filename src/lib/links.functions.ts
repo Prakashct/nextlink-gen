@@ -92,9 +92,9 @@ export const updateLink = createServerFn({ method: "POST" })
       .parse(input),
   )
   .handler(async ({ data, context }) => {
-    const patch: Record<string, unknown> = {};
-    if (data.destination_url !== undefined) patch["destination_url"] = data.destination_url.trim();
-    if (data.is_active !== undefined) patch["is_active"] = data.is_active;
+    const patch: { destination_url?: string; is_active?: boolean } = {};
+    if (data.destination_url !== undefined) patch.destination_url = data.destination_url.trim();
+    if (data.is_active !== undefined) patch.is_active = data.is_active;
     if (Object.keys(patch).length === 0) throw new Error("Nothing to update");
 
     const { data: row, error } = await context.supabase
