@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as SlugRouteImport } from './routes/$slug'
+import { Route as AuthRouteImport } from './routes/auth'
 import { Route as UnavailableRouteImport } from './routes/unavailable'
 
 const IndexRoute = IndexRouteImport.update({
@@ -23,6 +24,11 @@ const SlugRoute = SlugRouteImport.update({
   path: '/$slug',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthRoute = AuthRouteImport.update({
+  id: '/auth',
+  path: '/auth',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const UnavailableRoute = UnavailableRouteImport.update({
   id: '/unavailable',
   path: '/unavailable',
@@ -32,30 +38,34 @@ const UnavailableRoute = UnavailableRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/$slug': typeof SlugRoute
+  '/auth': typeof AuthRoute
   '/unavailable': typeof UnavailableRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/$slug': typeof SlugRoute
+  '/auth': typeof AuthRoute
   '/unavailable': typeof UnavailableRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/$slug': typeof SlugRoute
+  '/auth': typeof AuthRoute
   '/unavailable': typeof UnavailableRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/$slug' | '/unavailable'
+  fullPaths: '/' | '/$slug' | '/auth' | '/unavailable'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/$slug' | '/unavailable'
-  id: '__root__' | '/' | '/$slug' | '/unavailable'
+  to: '/' | '/$slug' | '/auth' | '/unavailable'
+  id: '__root__' | '/' | '/$slug' | '/auth' | '/unavailable'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   SlugRoute: typeof SlugRoute
+  AuthRoute: typeof AuthRoute
   UnavailableRoute: typeof UnavailableRoute
 }
 
@@ -75,6 +85,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SlugRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/auth': {
+      id: '/auth'
+      path: '/auth'
+      fullPath: '/auth'
+      preLoaderRoute: typeof AuthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/unavailable': {
       id: '/unavailable'
       path: '/unavailable'
@@ -88,6 +105,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   SlugRoute: SlugRoute,
+  AuthRoute: AuthRoute,
   UnavailableRoute: UnavailableRoute,
 }
 export const routeTree = rootRouteImport
