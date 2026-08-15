@@ -100,7 +100,7 @@ function AuthPage() {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="admin@nxtgentechhub.in"
+                placeholder="admin@nxtgentechhub.com"
               />
             </div>
             <div className="space-y-2">
