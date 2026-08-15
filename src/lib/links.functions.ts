@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { generateSlug, isReservedSlug, isSafeDestination, isValidSlug, normalizeSlug } from "@/lib/slug";
+import { invalidateCachedLink } from "@/lib/redirect-cache";
 
 export type LinkRow = {
   id: string;
