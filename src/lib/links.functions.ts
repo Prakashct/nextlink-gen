@@ -73,7 +73,10 @@ export const createLink = createServerFn({ method: "POST" })
         .select("id, slug, destination_url, is_active, click_count, created_at, updated_at")
         .single();
 
-      if (!error) return row as LinkRow;
+      if (!error) {
+        invalidateCachedLink((row as LinkRow).slug);
+        return row as LinkRow;
+      }
 
       if (error.code === "23505" || error.code === "23514" || !error.message.includes("duplicate")) {
         throw new Error(error.message);
