@@ -29,7 +29,12 @@ export const Route = createFileRoute("/$slug")({
             }
             return new Response(null, {
               status: 302,
-              headers: { location: destination.toString(), "cache-control": "no-store" },
+              headers: {
+                location: destination.toString(),
+                // Cache a successful lookup briefly at the edge so popular links
+                // redirect immediately while edits still propagate quickly.
+                "cache-control": "public, max-age=0, s-maxage=30, stale-while-revalidate=300",
+              },
             });
           }
 
