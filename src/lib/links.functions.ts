@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { generateSlug, isReservedSlug, isSafeDestination, isValidSlug, normalizeSlug } from "@/lib/slug";
+import { invalidateCachedLink } from "@/lib/redirect-cache";
 
 export type LinkRow = {
   id: string;
@@ -72,7 +73,10 @@ export const createLink = createServerFn({ method: "POST" })
         .select("id, slug, destination_url, is_active, click_count, created_at, updated_at")
         .single();
 
-      if (!error) return row as LinkRow;
+      if (!error) {
+        invalidateCachedLink((row as LinkRow).slug);
+        return row as LinkRow;
+      }
 
       if (error.code === "23505" || error.code === "23514" || !error.message.includes("duplicate")) {
         throw new Error(error.message);
@@ -118,6 +122,7 @@ export const updateLink = createServerFn({ method: "POST" })
       .select("id, slug, destination_url, is_active, click_count, created_at, updated_at")
       .single();
     if (error) throw new Error(error.message);
+    invalidateCachedLink((row as LinkRow).slug);
     return row as LinkRow;
   });
 
@@ -125,8 +130,14 @@ export const deleteLink = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: { id: string }) => z.object({ id: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
-    const { error } = await context.supabase.from("links").delete().eq("id", data.id);
+    const { data: row, error } = await context.supabase
+      .from("links")
+      .delete()
+      .eq("id", data.id)
+      .select("slug")
+      .maybeSingle();
     if (error) throw new Error(error.message);
+    invalidateCachedLink(row?.slug ?? null);
     return { ok: true };
   });
 

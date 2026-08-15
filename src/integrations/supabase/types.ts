@@ -81,6 +81,18 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      log_click: {
+        Args: { _link_id: string; _referrer?: string }
+        Returns: undefined
+      }
+      lookup_link: {
+        Args: { _slug: string }
+        Returns: {
+          destination_url: string
+          link_id: string
+          status: string
+        }[]
+      }
       resolve_link: {
         Args: { _referrer?: string; _slug: string }
         Returns: {
