@@ -1,7 +1,17 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { normalizeSlug } from "@/lib/slug";
+import {
+  getCachedLink,
+  invalidateCachedLink,
+  runInBackground,
+  setCachedLink,
+  type CachedLink,
+} from "@/lib/redirect-cache";
 
-// Server-only redirect route: /:slug -> destination URL (302), click recorded first.
+const CACHE_HEADER = "public, max-age=0, s-maxage=300, stale-while-revalidate=86400";
+
+// Server-only redirect route: /:slug -> destination URL (302).
+// Hot path: memory cache -> read-only DB lookup. Click logging happens after the response.
 export const Route = createFileRoute("/$slug")({
   server: {
     handlers: {
@@ -9,42 +19,67 @@ export const Route = createFileRoute("/$slug")({
         const slug = normalizeSlug(params.slug ?? "");
         if (!slug) return Response.redirect(new URL("/unavailable?reason=not_found", request.url), 302);
 
+        const referrer = request.headers.get("referer");
+
         try {
-          const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-          const referrer = request.headers.get("referer");
-          const { data, error } = await supabaseAdmin.rpc("resolve_link", {
-            _slug: slug,
-            ...(referrer ? { _referrer: referrer } : {}),
-          });
+          let entry = getCachedLink(slug);
 
-          if (error) throw error;
-          const result = Array.isArray(data) ? data[0] : data;
+          if (!entry) {
+            const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+            const { data, error } = await supabaseAdmin.rpc("lookup_link", { _slug: slug });
+            if (error) throw error;
+            const row = (Array.isArray(data) ? data[0] : data) as
+              | { link_id: string | null; destination_url: string | null; status: string }
+              | undefined;
 
-          if (result?.status === "ok" && result.destination_url) {
-            const destination = new URL(result.destination_url);
+            entry = {
+              linkId: row?.link_id ?? null,
+              destination: row?.destination_url ?? null,
+              status: (row?.status as CachedLink["status"]) ?? "not_found",
+            };
+            setCachedLink(slug, entry);
+          }
+
+          if (entry.status === "ok" && entry.destination) {
+            const destination = new URL(entry.destination);
             const current = new URL(request.url);
             // Redirect-loop protection: never bounce back to this same short URL.
             if (destination.host === current.host) {
+              invalidateCachedLink(slug);
               return Response.redirect(new URL("/unavailable?reason=loop", request.url), 302);
             }
+
+            if (entry.linkId) {
+              const linkId = entry.linkId;
+              runInBackground(
+                import("@/integrations/supabase/client.server").then(({ supabaseAdmin }) =>
+                  supabaseAdmin.rpc("log_click", {
+                    _link_id: linkId,
+                    ...(referrer ? { _referrer: referrer } : {}),
+                  }),
+                ),
+              );
+            }
+
             return new Response(null, {
               status: 302,
               headers: {
                 location: destination.toString(),
-                // Cache a successful lookup briefly at the edge so popular links
-                // redirect immediately while edits still propagate quickly.
-                "cache-control": "public, max-age=0, s-maxage=30, stale-while-revalidate=300",
+                // Cache at the edge so repeat visits redirect instantly.
+                "cache-control": CACHE_HEADER,
               },
             });
           }
 
-          const reason = result?.status === "disabled" ? "disabled" : "not_found";
+          const reason = entry.status === "disabled" ? "disabled" : "not_found";
           return Response.redirect(new URL(`/unavailable?reason=${reason}`, request.url), 302);
         } catch (err) {
           console.error("redirect lookup failed", err);
+          invalidateCachedLink(slug);
           return Response.redirect(new URL("/unavailable?reason=error", request.url), 302);
         }
       },
     },
   },
 });
+
