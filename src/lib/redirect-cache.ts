@@ -7,8 +7,9 @@ export type CachedLink = {
   status: "ok" | "disabled" | "not_found";
 };
 
-const TTL_MS = 60_000;
-const MAX_ENTRIES = 500;
+const TTL_MS = 300_000;
+const MAX_ENTRIES = 5000;
+const WARM_TTL_MS = 300_000;
 
 const cache = new Map<string, { value: CachedLink; expiresAt: number }>();
 
@@ -36,6 +37,39 @@ export function setCachedLink(slug: string, value: CachedLink) {
 export function invalidateCachedLink(slug?: string | null) {
   if (!slug) return;
   cache.delete(slug.toLowerCase());
+  warmedAt = 0;
+  warming = null;
+}
+
+/** Preload every link into memory so the very first click on any slug is warm. */
+let warmedAt = 0;
+let warming: Promise<void> | null = null;
+
+export function warmAllLinks(
+  load: () => Promise<Array<{ id: string; slug: string; destination_url: string; is_active: boolean }>>,
+): Promise<void> {
+  if (Date.now() - warmedAt < WARM_TTL_MS) return Promise.resolve();
+  if (warming) return warming;
+
+  warming = load()
+    .then((rows) => {
+      for (const row of rows) {
+        setCachedLink(row.slug.toLowerCase(), {
+          linkId: row.id,
+          destination: row.destination_url,
+          status: row.is_active ? "ok" : "disabled",
+        });
+      }
+      warmedAt = Date.now();
+    })
+    .catch((err) => {
+      console.error("warm cache failed", err);
+    })
+    .finally(() => {
+      warming = null;
+    });
+
+  return warming;
 }
 
 /** Run background work without blocking the response, when the runtime allows it. */

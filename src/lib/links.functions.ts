@@ -2,7 +2,16 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { generateSlug, isReservedSlug, isSafeDestination, isValidSlug, normalizeSlug } from "@/lib/slug";
-import { invalidateCachedLink } from "@/lib/redirect-cache";
+import { invalidateCachedLink, setCachedLink } from "@/lib/redirect-cache";
+
+function primeCache(row: { id: string; slug: string; destination_url: string; is_active: boolean }) {
+  invalidateCachedLink(row.slug);
+  setCachedLink(row.slug.toLowerCase(), {
+    linkId: row.id,
+    destination: row.destination_url,
+    status: row.is_active ? "ok" : "disabled",
+  });
+}
 
 export type LinkRow = {
   id: string;
@@ -74,7 +83,7 @@ export const createLink = createServerFn({ method: "POST" })
         .single();
 
       if (!error) {
-        invalidateCachedLink((row as LinkRow).slug);
+        primeCache(row as LinkRow);
         return row as LinkRow;
       }
 
@@ -122,7 +131,7 @@ export const updateLink = createServerFn({ method: "POST" })
       .select("id, slug, destination_url, is_active, click_count, created_at, updated_at")
       .single();
     if (error) throw new Error(error.message);
-    invalidateCachedLink((row as LinkRow).slug);
+    primeCache(row as LinkRow);
     return row as LinkRow;
   });
 
