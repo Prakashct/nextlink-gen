@@ -83,7 +83,7 @@ export const createLink = createServerFn({ method: "POST" })
         .single();
 
       if (!error) {
-        invalidateCachedLink((row as LinkRow).slug);
+        primeCache(row as LinkRow);
         return row as LinkRow;
       }
 
@@ -131,7 +131,7 @@ export const updateLink = createServerFn({ method: "POST" })
       .select("id, slug, destination_url, is_active, click_count, created_at, updated_at")
       .single();
     if (error) throw new Error(error.message);
-    invalidateCachedLink((row as LinkRow).slug);
+    primeCache(row as LinkRow);
     return row as LinkRow;
   });
 
