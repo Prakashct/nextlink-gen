@@ -122,6 +122,7 @@ export const updateLink = createServerFn({ method: "POST" })
       .select("id, slug, destination_url, is_active, click_count, created_at, updated_at")
       .single();
     if (error) throw new Error(error.message);
+    invalidateCachedLink((row as LinkRow).slug);
     return row as LinkRow;
   });
 
@@ -129,8 +130,14 @@ export const deleteLink = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: { id: string }) => z.object({ id: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
-    const { error } = await context.supabase.from("links").delete().eq("id", data.id);
+    const { data: row, error } = await context.supabase
+      .from("links")
+      .delete()
+      .eq("id", data.id)
+      .select("slug")
+      .maybeSingle();
     if (error) throw new Error(error.message);
+    invalidateCachedLink(row?.slug ?? null);
     return { ok: true };
   });
 
